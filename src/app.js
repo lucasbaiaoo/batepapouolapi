@@ -8,13 +8,13 @@ import dayjs from "dayjs";
 dotenv.config();
 
 const participantSchema = joi.object({
-    name: joi.string().required().trim()
+    name: joi.string().trim().required()
 });
 
 const messageSchema = joi.object({
-    to: joi.string().required().trim(),
-    text: joi.string().required().trim(),
-    type: joi.string().required().valid("message", "private_message").trim()
+    to: joi.string().trim().required(),
+    text: joi.string().trim().required(),
+    type: joi.string().trim().valid("message", "private_message").required()
 });
 
 const mongoClient = new MongoClient(process.env.MONGO_URI);
@@ -50,7 +50,7 @@ server.post("/participants", async (req, res) => {
         }
 
         await db.collection("participants").insertOne({name: name, lastStatus: Date.now()})
-        await db.collection("messages").insertOne({from: name, to: "Todos", text: "entra na sala...", type: "status", time: dayjs().format("HH:mm:ss".trim())})
+        await db.collection("messages").insertOne({from: name, to: "Todos", text: "entra na sala...", type: "status", time: dayjs().format("HH:mm:ss")})
         res.sendStatus(201);
     } catch (error) {
         console.log(error);
@@ -89,7 +89,7 @@ server.post("/messages", async (req,res) => {
             return;
         }
 
-        await db.collection("messages").insertOne({from: from, to: to, text: text, type: type, time: dayjs().format("HH:mm:ss".trim())})
+        await db.collection("messages").insertOne({from: from, to: to, text: text, type: type, time: dayjs().format("HH:mm:ss")})
         res.sendStatus(201);
     } catch (error){
         console.log(error);
@@ -138,5 +138,25 @@ server.post("/status", async (req, res) => {
         res.sendStatus(500);
     }
 })
+
+async function handleIdleUsers(){
+
+    const participants = await db.collection("participants").find({lastStatus: {$lt: Date.now() - 10000} }).toArray();
+    const exitMessage = participants.map((participant) => ({from: participant.name, to: "Todos", text: "sai da sala...", type: "status", time: dayjs().format("HH:mm:ss")}))
+
+    try{
+        if(participants.length !== 0){
+        await db.collection("participants").deleteMany({lastStatus: {$lt: Date.now() - 10000} });
+        await db.collection("messages").insertMany(exitMessage);
+        }
+    } catch (error) {
+        console.log(error);
+    }
+
+    
+
+}
+
+setInterval(handleIdleUsers, 15000)
 
 server.listen(5000);
