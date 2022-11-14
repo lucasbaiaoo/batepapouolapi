@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import joi from "joi";
 import dayjs from "dayjs";
@@ -141,10 +141,10 @@ server.post("/status", async (req, res) => {
 
 async function handleIdleUsers(){
 
-    const participants = await db.collection("participants").find({lastStatus: {$lt: Date.now() - 10000} }).toArray();
-    const exitMessage = participants.map((participant) => ({from: participant.name, to: "Todos", text: "sai da sala...", type: "status", time: dayjs().format("HH:mm:ss")}))
-
     try{
+        const participants = await db.collection("participants").find({lastStatus: {$lt: Date.now() - 10000} }).toArray();
+        const exitMessage = participants.map((participant) => ({from: participant.name, to: "Todos", text: "sai da sala...", type: "status", time: dayjs().format("HH:mm:ss")}))
+
         if(participants.length !== 0){
         await db.collection("participants").deleteMany({lastStatus: {$lt: Date.now() - 10000} });
         await db.collection("messages").insertMany(exitMessage);
@@ -153,10 +153,33 @@ async function handleIdleUsers(){
         console.log(error);
     }
 
-    
-
 }
 
 setInterval(handleIdleUsers, 15000)
+
+server.delete("/messages/:id", async (req, res) => {
+    const from = req.headers.user.trim();
+    const id = req.params.id;
+
+    try {
+        const existingMessage = await db.collection("messages").findOne({ _id: ObjectId(id) });
+
+        if(!existingMessage){
+            res.sendStatus(404);
+            return;
+        }
+
+        if(from !== existingMessage.from){
+            res.sendStatus(401);
+            return;
+        }
+
+        await db.collection("messages").deleteOne({ _id: ObjectId(id) });
+        res.sendStatus(200);
+    } catch (error) {
+        console.log(error);
+        res.sendStatus(500);
+    }
+})
 
 server.listen(5000);
