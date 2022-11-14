@@ -14,7 +14,7 @@ const participantSchema = joi.object({
 const messageSchema = joi.object({
     to: joi.string().required().trim(),
     text: joi.string().required().trim(),
-    type: joi.string().required().valid("message", "private_message")
+    type: joi.string().required().valid("message", "private_message").trim()
 });
 
 const mongoClient = new MongoClient(process.env.MONGO_URI);
@@ -33,7 +33,7 @@ server.use(cors());
 server.use(express.json());
 
 server.post("/participants", async (req, res) => {
-    const name = req.body.name;
+    const name = req.body.name.trim();
     const validation = participantSchema.validate(req.body, {abortEarly: false});
 
     if(validation.error){
@@ -50,7 +50,7 @@ server.post("/participants", async (req, res) => {
         }
 
         await db.collection("participants").insertOne({name: name, lastStatus: Date.now()})
-        await db.collection("messages").insertOne({from: name, to: "Todos", text: "entra na sala...", type: "status", time: dayjs().format("HH:mm:ss")})
+        await db.collection("messages").insertOne({from: name, to: "Todos", text: "entra na sala...", type: "status", time: dayjs().format("HH:mm:ss".trim())})
         res.sendStatus(201);
     } catch (error) {
         console.log(error);
@@ -72,8 +72,7 @@ server.post("/messages", async (req,res) => {
     const to = req.body.to;
     const text = req.body.text;
     const type = req.body.type;
-    const from = req.headers.user;
-    console.log(from);
+    const from = req.headers.user.trim();
     const validation = messageSchema.validate(req.body, {abortEarly: false});
 
     if(validation.error){
@@ -90,7 +89,7 @@ server.post("/messages", async (req,res) => {
             return;
         }
 
-        await db.collection("messages").insertOne({from: from, to: to, text: text, type: type, time: dayjs().format("HH:mm:ss")})
+        await db.collection("messages").insertOne({from: from, to: to, text: text, type: type, time: dayjs().format("HH:mm:ss".trim())})
         res.sendStatus(201);
     } catch (error){
         console.log(error);
@@ -115,6 +114,25 @@ server.get("/messages", async (req, res) => {
             }
           ]}).sort({_id: -1}).limit(limit).toArray()
           res.send(messages.reverse())
+    } catch (error) {
+        console.log(error);
+        res.sendStatus(500);
+    }
+})
+
+server.post("/status", async (req, res) => {
+    const participant = req.headers.user
+
+    try{
+        const existingParticipant = await db.collection("participants").findOne({name: participant})
+
+        if(!existingParticipant) {
+            res.sendStatus(404);
+            return;
+        }       
+        
+        await db.collection("participants").updateOne({name: participant}, {$set:{ lastStatus:Date.now() }})
+        res.sendStatus(201);
     } catch (error) {
         console.log(error);
         res.sendStatus(500);
