@@ -142,12 +142,11 @@ server.post("/status", async (req, res) => {
 })
 
 async function handleIdleUsers(){
-
     try{
-        const participants = await db.collection("participants").find({lastStatus: {$lt: Date.now() - 10000} }).toArray();
-        const exitMessage = participants.map((participant) => ({from: participant.name, to: "Todos", text: "sai da sala...", type: "status", time: dayjs().format("HH:mm:ss")}))
+        const idleParticipants = await db.collection("participants").find({lastStatus: {$lt: Date.now() - 10000} }).toArray();
+        const exitMessage = idleParticipants.map((idleParticipant) => ({from: idleParticipant.name, to: "Todos", text: "sai da sala...", type: "status", time: dayjs().format("HH:mm:ss")}))
 
-        if(participants.length !== 0){
+        if(idleParticipants.length !== 0){
         await db.collection("participants").deleteMany({lastStatus: {$lt: Date.now() - 10000} });
         await db.collection("messages").insertMany(exitMessage);
         }
