@@ -4,6 +4,7 @@ import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import joi from "joi";
 import dayjs from "dayjs";
+import { stripHtml } from "string-strip-html";
 
 dotenv.config();
 
@@ -33,7 +34,7 @@ server.use(cors());
 server.use(express.json());
 
 server.post("/participants", async (req, res) => {
-    const name = req.body.name.trim();
+    const name = stripHtml(req.body.name).result.trim();
     const validation = participantSchema.validate(req.body, {abortEarly: false});
 
     if(validation.error){
@@ -44,6 +45,7 @@ server.post("/participants", async (req, res) => {
 
     try{
         const existingParticipant = await db.collection("participants").findOne({name: name})
+         
         if(existingParticipant) {
             res.sendStatus(409);
             return;
@@ -69,9 +71,9 @@ server.get("/participants", async (req, res) => {
 })
 
 server.post("/messages", async (req,res) => {
-    const to = req.body.to;
-    const text = req.body.text;
-    const type = req.body.type;
+    const to = stripHtml(req.body.to).result;
+    const text = stripHtml(req.body.text).result;
+    const type = stripHtml(req.body.type).result;
     const from = req.headers.user.trim();
     const validation = messageSchema.validate(req.body, {abortEarly: false});
 
