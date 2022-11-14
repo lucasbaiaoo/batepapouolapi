@@ -182,4 +182,40 @@ server.delete("/messages/:id", async (req, res) => {
     }
 })
 
+server.put("/messages/:id", async (req, res) => {
+    const updatedMessage = req.body
+    const from = req.headers.user.trim();
+    const validation = messageSchema.validate(updatedMessage, {abortEarly: false});
+    const id = req.params.id;
+
+    if(validation.error){
+        const errors = validation.error.details.map((detail) => detail.message);
+        res.status(422).send(errors);
+        return;
+    }
+
+    try{
+        const existingMessage = await db.collection("messages").findOne({ _id: ObjectId(id) });
+
+        if(!existingMessage){
+            res.sendStatus(404);
+            return;
+        }
+
+        if(from !== existingMessage.from){
+            res.sendStatus(401);
+            return;
+        }
+
+        await db.collection("messages").updateOne(
+            { _id: ObjectId(id) },
+            { $set: updatedMessage }
+            );
+        res.sendStatus(200);
+    } catch (error) {
+        console.log(error);
+        res.sendStatus(500);
+    }
+})
+
 server.listen(5000);
